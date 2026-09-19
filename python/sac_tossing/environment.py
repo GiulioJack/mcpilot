@@ -96,7 +96,7 @@ class TossingSACEnv(gym.Env):
             selected_service = service_name or config["service_train"]
             self.backend = RosTossingBackend(
                 service_name=selected_service,
-                bullet_model_name=config.get("bullet_model_name", "red_ball"),
+                bullet_model_name=config.get("bullet_model_name", "red_ball_friction"),
                 orientation=config.get("orientation", [0.0, 0.0, 0.0]),
                 service_timeout=float(config.get("service_timeout", 600.0)),
                 retries=int(config.get("service_retries", 1)),

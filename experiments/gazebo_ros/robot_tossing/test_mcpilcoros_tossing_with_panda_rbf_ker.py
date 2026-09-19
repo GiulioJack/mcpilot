@@ -50,7 +50,7 @@ centers_init_type = ''
 num_toss_test = 0.0
 use_dropout = True
 num_particles = -1
-bullet_name = 'red_ball'
+bullet_name = 'red_ball_friction'
 num_trials = num_exp = num_test_trials = 1
 verbose = False
 std_ctrl_noise = 0.1

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #include "ros/callback_queue.h"
 #include "ros/ros.h"
 #include "ros/subscribe_options.h"

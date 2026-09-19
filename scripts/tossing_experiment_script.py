@@ -55,9 +55,11 @@ bullet_delta_grasping = [0.135, 0.18]
 
 load_position = [-3.0, 0.0, 0.5]
 
-bullet_name = 'red_ball'
-rospy.set_param('bullet_name', bullet_name)
-bullets_names = ['red_ball']
+# Use the projectile selected by the launch file.  The package ships
+# ``red_ball_friction``; keeping the legacy ``red_ball`` name here made
+# calibration wait forever for a non-existent ``/red_ball_odom`` topic.
+bullet_name = rospy.get_param('bullet_name', 'red_ball_friction')
+bullets_names = [bullet_name]
 
 target_item_name = 'target'
 bullet_odom_format = '{}_odom'

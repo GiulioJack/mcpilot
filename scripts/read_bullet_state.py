@@ -27,7 +27,7 @@ from robot_tossing_utils.panda_utils import TOSS_TYPE_below, TOSS_TYPE_catapult_
 from robot_tossing_utils.release_delay import DelayConfig, ReconfigurableDelaySampler
 
 TOSS_TYPE = TOSS_TYPE_below
-bullet = "red_ball"
+bullet = "red_ball_friction"
 model_trj = ModelTrajectory()
 bullet_pub = None
 release_position = [7.55177987e-01, -2.56263722e-04, 1.1]
@@ -921,7 +921,7 @@ def bullet_callback(model_status, ref_bullet):
 
 def synch(_clock_msg):
     global bullet
-    bullet = rospy.get_param("bullet_name", "red_ball")
+    bullet = rospy.get_param("bullet_name", "red_ball_friction")
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@ import tossing_utils
     
 """
 
-bullet_name = 'red_ball'
+bullet_name = 'red_ball_friction'
 seed = 10
 v_mult = 1.0
 model_drag = False
@@ -85,7 +85,7 @@ paired_eval_seed = seed + 513 if evaluation_seed < 0 else evaluation_seed + seed
 torch.manual_seed(paired_eval_seed)
 np.random.seed(paired_eval_seed)
 experiment_srv_name = 'tossing_experiment_testing'
-red_ball_state_topic = 'red_ball_odom'
+red_ball_state_topic = 'red_ball_friction_odom'
 
 num_trials = num_toss_test
 # release_position = tossing_utils.release_position

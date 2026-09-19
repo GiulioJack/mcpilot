@@ -208,7 +208,7 @@ class MC_PILCO_ROS_Tossing_Experiment(MC_PILCO_ROS_Experiment):
                  target_indeces, target_dim, release_position,
                  jacobian, forward_kinematics, initial_cond_func,
                  targets_dist_function, sigma_dist_function, t_delay_dist,
-                 bullet_name='red_ball',
+                 bullet_name='red_ball_friction',
                  skip_fist_samples=5,
                  std_meas_noise=None, log_path=None, flg_simulate_diff_targets=True,
                  filtering_dict={}, std_meas_noise_sim=None, trials_data_save_path=None, load_cached_trials=False,

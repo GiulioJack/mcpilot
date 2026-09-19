@@ -351,7 +351,7 @@ def getPolicy(u_max, state_dim, target_dim, device, dtype, max_dist=0.5, max_yaw
 
 
 def test_policy(policy_model, num_trials, seed, f_init_particles=f_init_particles_50cm, save=False, save_post_str='1',
-                use_policy=True, bullet_name='red_ball', orientation=None, save_dir=None):
+                use_policy=True, bullet_name='red_ball_friction', orientation=None, save_dir=None):
     """
         Test the policy on a set of random sampled targets
 
