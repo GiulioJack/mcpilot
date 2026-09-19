@@ -1,0 +1,240 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f7e63e0..9ee3201 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -30,6 +30,7 @@ find_package(gazebo REQUIRED)
+ add_service_files(
+   FILES
+   Attach.srv
++  ScheduledDetach.srv
+ )
+ 
+ 
+diff --git a/include/gazebo_ros_link_attacher.h b/include/gazebo_ros_link_attacher.h
+index f01feb1..f868d51 100644
+--- a/include/gazebo_ros_link_attacher.h
++++ b/include/gazebo_ros_link_attacher.h
+@@ -8,6 +8,8 @@
+ #define GAZEBO_ROS_LINK_ATTACHER_HH
+ 
+ #include <boost/thread/recursive_mutex.hpp>
++#include <condition_variable>
++#include <mutex>
+ 
+ #include <ros/ros.h>
+ 
+@@ -24,6 +26,7 @@
+ #include "gazebo_ros_link_attacher/Attach.h"
+ #include "gazebo_ros_link_attacher/AttachRequest.h"
+ #include "gazebo_ros_link_attacher/AttachResponse.h"
++#include "gazebo_ros_link_attacher/ScheduledDetach.h"
+ 
+ namespace gazebo
+ {
+@@ -67,14 +70,37 @@ namespace gazebo
+         ros::NodeHandle nh_;
+         ros::ServiceServer attach_service_;
+         ros::ServiceServer detach_service_;
++        ros::ServiceServer scheduled_detach_service_;
+ 
+         bool attach_callback(gazebo_ros_link_attacher::Attach::Request &req,
+                               gazebo_ros_link_attacher::Attach::Response &res);
+         bool detach_callback(gazebo_ros_link_attacher::Attach::Request &req,
+                              gazebo_ros_link_attacher::Attach::Response &res);
++        bool scheduled_detach_callback(
++            gazebo_ros_link_attacher::ScheduledDetach::Request &req,
++            gazebo_ros_link_attacher::ScheduledDetach::Response &res);
++        void on_world_update(const common::UpdateInfo &_info);
+ 
+         std::vector<fixedJoint> joints;
+ 
++        // One synthetic ground-truth release can be pending at a time.  The
++        // ROS service callback only registers the requested simulation-time
++        // deadline and waits.  The actual joint detach is executed from the
++        // Gazebo WorldUpdateBegin callback, avoiding ROS/Python scheduling
++        // latency in the imposed release delay.
++        std::mutex scheduled_detach_mutex_;
++        std::condition_variable scheduled_detach_cv_;
++        bool scheduled_detach_active_;
++        bool scheduled_detach_completed_;
++        bool scheduled_detach_result_;
++        std::string scheduled_model1_;
++        std::string scheduled_link1_;
++        std::string scheduled_model2_;
++        std::string scheduled_link2_;
++        double scheduled_detach_deadline_;
++        double scheduled_detach_actual_time_;
++        event::ConnectionPtr update_connection_;
++
+         boost::recursive_mutex* physics_mutex;
+ 
+         /// \brief The physics engine.
+diff --git a/src/gazebo_ros_link_attacher.cpp b/src/gazebo_ros_link_attacher.cpp
+index 6d53a35..2d3f2fb 100644
+--- a/src/gazebo_ros_link_attacher.cpp
++++ b/src/gazebo_ros_link_attacher.cpp
+@@ -5,7 +5,9 @@
+ #include "gazebo_ros_link_attacher/Attach.h"
+ #include "gazebo_ros_link_attacher/AttachRequest.h"
+ #include "gazebo_ros_link_attacher/AttachResponse.h"
++#include "gazebo_ros_link_attacher/ScheduledDetach.h"
+ #include <ignition/math/Pose3.hh>
++#include <functional>
+ 
+ namespace gazebo
+ {
+@@ -14,7 +16,12 @@ namespace gazebo
+ 
+   // Constructor
+   GazeboRosLinkAttacher::GazeboRosLinkAttacher() :
+-    nh_("link_attacher_node")
++    nh_("link_attacher_node"),
++    scheduled_detach_active_(false),
++    scheduled_detach_completed_(false),
++    scheduled_detach_result_(false),
++    scheduled_detach_deadline_(0.0),
++    scheduled_detach_actual_time_(0.0)
+   {
+   }
+ 
+@@ -42,6 +49,17 @@ namespace gazebo
+     ROS_INFO_STREAM("Attach service at: " << this->nh_.resolveName("attach"));
+     this->detach_service_ = this->nh_.advertiseService("detach", &GazeboRosLinkAttacher::detach_callback, this);
+     ROS_INFO_STREAM("Detach service at: " << this->nh_.resolveName("detach"));
++    this->scheduled_detach_service_ = this->nh_.advertiseService(
++        "scheduled_detach", &GazeboRosLinkAttacher::scheduled_detach_callback, this);
++    ROS_INFO_STREAM("Scheduled-detach service at: "
++                    << this->nh_.resolveName("scheduled_detach"));
++
++    // The synthetic ground-truth release is executed from the Gazebo update
++    // thread itself.  This removes ROS timer, callback and service-call latency
++    // from the imposed release timestamp; quantization is only one physics step.
++    this->update_connection_ = event::Events::ConnectWorldUpdateBegin(
++        std::bind(&GazeboRosLinkAttacher::on_world_update,
++                  this, std::placeholders::_1));
+     ROS_INFO("Link attacher node initialized.");
+   }
+ 
+@@ -214,4 +232,107 @@ namespace gazebo
+       return true;
+   }
+ 
++
++  bool GazeboRosLinkAttacher::scheduled_detach_callback(
++      gazebo_ros_link_attacher::ScheduledDetach::Request &req,
++      gazebo_ros_link_attacher::ScheduledDetach::Response &res)
++  {
++    std::unique_lock<std::mutex> lock(this->scheduled_detach_mutex_);
++
++    if (this->scheduled_detach_active_)
++    {
++      res.ok = false;
++      res.actual_detach_sim_time = 0.0;
++      res.message = "another scheduled detach is already pending";
++      ROS_ERROR_STREAM("Scheduled detach rejected: " << res.message);
++      return true;
++    }
++
++    const double now = this->world->SimTime().Double();
++    this->scheduled_model1_ = req.model_name_1;
++    this->scheduled_link1_ = req.link_name_1;
++    this->scheduled_model2_ = req.model_name_2;
++    this->scheduled_link2_ = req.link_name_2;
++    this->scheduled_detach_deadline_ = req.detach_sim_time;
++    this->scheduled_detach_actual_time_ = 0.0;
++    this->scheduled_detach_result_ = false;
++    this->scheduled_detach_completed_ = false;
++    this->scheduled_detach_active_ = true;
++
++    ROS_INFO_STREAM("Scheduled detach registered for "
++                    << this->scheduled_model2_ << " at sim time "
++                    << this->scheduled_detach_deadline_ << " s (now "
++                    << now << " s)");
++
++    // The callback deliberately waits for the Gazebo update thread to execute
++    // the detach.  Waiting here does not determine the release timestamp; it
++    // only lets the caller receive the *actual* simulator time at which the
++    // joint was detached.
++    while (!this->scheduled_detach_completed_ && ros::ok())
++      this->scheduled_detach_cv_.wait(lock);
++
++    if (!this->scheduled_detach_completed_)
++    {
++      this->scheduled_detach_active_ = false;
++      res.ok = false;
++      res.actual_detach_sim_time = 0.0;
++      res.message = "ROS shutdown before scheduled detach completed";
++      return true;
++    }
++
++    res.ok = this->scheduled_detach_result_;
++    res.actual_detach_sim_time = this->scheduled_detach_actual_time_;
++    res.message = res.ok ? "scheduled detach completed"
++                         : "scheduled detach reached deadline but joint detach failed";
++    return true;
++  }
++
++
++  void GazeboRosLinkAttacher::on_world_update(const common::UpdateInfo &_info)
++  {
++    std::unique_lock<std::mutex> lock(this->scheduled_detach_mutex_);
++    if (!this->scheduled_detach_active_ || this->scheduled_detach_completed_)
++      return;
++
++    const double sim_time = _info.simTime.Double();
++    if (sim_time + 1e-12 < this->scheduled_detach_deadline_)
++      return;
++
++    const std::string model1 = this->scheduled_model1_;
++    const std::string link1 = this->scheduled_link1_;
++    const std::string model2 = this->scheduled_model2_;
++    const std::string link2 = this->scheduled_link2_;
++
++    // WorldUpdateBegin executes in the simulator update thread.  The timestamp
++    // below is therefore the first physics step whose simulation time is at or
++    // after the requested deadline.
++    // We are already running inside Gazebo's WorldUpdateBegin callback.
++    // Do NOT call detach(), because detach() acquires the physics update
++    // mutex for ROS service-thread safety; reacquiring it from the simulator
++    // update thread can deadlock.  Detach the already-known joint directly.
++    fixedJoint scheduled_joint;
++    bool ok = false;
++    if (this->getJoint(model1, link1, model2, link2, scheduled_joint))
++    {
++      scheduled_joint.joint->Detach();
++      ok = true;
++    }
++
++    this->scheduled_detach_actual_time_ = sim_time;
++    this->scheduled_detach_result_ = ok;
++    this->scheduled_detach_completed_ = true;
++    this->scheduled_detach_active_ = false;
++
++    ROS_INFO_STREAM("Scheduled detach " << (ok ? "executed" : "FAILED")
++                    << " for " << model2
++                    << " | target=" << this->scheduled_detach_deadline_
++                    << " s | actual=" << sim_time
++                    << " s | overshoot="
++                    << 1000.0 * (sim_time - this->scheduled_detach_deadline_)
++                    << " ms");
++
++    lock.unlock();
++    this->scheduled_detach_cv_.notify_all();
++  }
++
+ }
+diff --git a/srv/ScheduledDetach.srv b/srv/ScheduledDetach.srv
+new file mode 100644
+index 0000000..0763f58
+--- /dev/null
++++ b/srv/ScheduledDetach.srv
+@@ -0,0 +1,9 @@
++string model_name_1
++string link_name_1
++string model_name_2
++string link_name_2
++float64 detach_sim_time
++---
++bool ok
++float64 actual_detach_sim_time
++string message

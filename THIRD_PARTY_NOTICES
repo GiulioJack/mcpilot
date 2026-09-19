@@ -1,0 +1,54 @@
+Third-party notices
+===================
+
+MC-PILCO
+--------
+Parts of the model-learning and policy-learning implementation are derived
+from the public MC-PILCO software package maintained by Mitsubishi Electric
+Research Laboratories (MERL). The upstream repository currently marks the
+main MC-PILCO implementation as AGPL-3.0-or-later.
+
+This package contains modified source derived from MC-PILCO. The modifications
+adapt the original framework to the simulated object-throwing task and were
+prepared for this 2026 reproducibility artifact.
+
+The upstream gpr_lib files used here are separately marked as MIT-licensed.
+The MIT copyright holder shown by the upstream project is Alberto Dalla Libera.
+This name is reproduced only because the MIT copyright notice must be retained;
+it is third-party licensing metadata and is not an authorship statement for
+this anonymous submission.
+
+Upstream project: https://github.com/merlresearch/MC-PILCO
+
+Gazebo ROS link attacher
+------------------------
+The experiments require pal-robotics/gazebo_ros_link_attacher at commit
+1d170c44c2f12dad4e8c23e299d46f3f655e7def plus the patch included in
+`dependencies/gazebo_ros_link_attacher_scheduled_detach.patch`.
+
+Panda MoveIt configuration
+--------------------------
+The development setup used ros-planning/panda_moveit_config at commit
+a86da56ab1c756a851d8ee2a06dd04266d1653d6.
+
+MIT license for the vendored gpr_lib files
+------------------------------------------
+Copyright (C) 2023 Alberto Dalla Libera
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

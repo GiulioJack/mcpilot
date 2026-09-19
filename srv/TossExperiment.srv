@@ -1,0 +1,11 @@
+#request
+float64[] target
+bool flg_exploration
+float64 policy_command
+string bullet_model_name
+float64[] orientation  # (alpha, beta, gamma)
+
+---
+#response
+float64[] trajectory
+float64[] inputs

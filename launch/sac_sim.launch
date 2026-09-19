@@ -1,0 +1,54 @@
+<launch>
+  <arg name="gazebo_gui" default="false" />
+  <arg name="delay_distribution" default="uniform" />
+  <arg name="delay_min_steps" default="120" />
+  <arg name="delay_max_steps" default="130" />
+  <arg name="delay_fixed_steps" default="125" />
+  <arg name="delay_mean_steps" default="125.0" />
+  <arg name="delay_std_steps" default="2.5" />
+  <arg name="delay_seed" default="0" />
+  <arg name="synthetic_ground_truth" default="true" />
+  <arg name="synthetic_delay_distribution" default="uniform" />
+  <arg name="synthetic_delay_min_ms" default="120.0" />
+  <arg name="synthetic_delay_max_ms" default="130.0" />
+  <arg name="synthetic_delay_fixed_ms" default="125.0" />
+  <arg name="synthetic_delay_seed" default="0" />
+
+  <param name="/tossing_experiment_ready" value="false" />
+  <param name="/tossing/target_altitude" value="0.1" />
+  <param name="/tossing/release_delay/enabled" value="true" />
+  <param name="/tossing/release_delay/distribution" value="$(arg delay_distribution)" />
+  <param name="/tossing/release_delay/min_steps" value="$(arg delay_min_steps)" />
+  <param name="/tossing/release_delay/max_steps" value="$(arg delay_max_steps)" />
+  <param name="/tossing/release_delay/fixed_steps" value="$(arg delay_fixed_steps)" />
+  <param name="/tossing/release_delay/mean_steps" value="$(arg delay_mean_steps)" />
+  <param name="/tossing/release_delay/std_steps" value="$(arg delay_std_steps)" />
+  <param name="/tossing/release_delay/seed" value="$(arg delay_seed)" />
+  <param name="/tossing/release_delay/reset_id" value="0" />
+  <param name="/tossing/release_delay/trigger_mode" value="command" />
+  <param name="/tossing/release_delay/anticipation_seconds" value="0.0" />
+  <param name="/tossing/release_delay/synthetic_ground_truth/enabled" value="$(arg synthetic_ground_truth)" />
+
+  <include file="$(find mcpilot)/launch/test_friction.launch">
+    <arg name="gazebo_gui" value="$(arg gazebo_gui)" />
+    <arg name="delay_distribution" value="$(arg delay_distribution)" />
+    <arg name="delay_min_steps" value="$(arg delay_min_steps)" />
+    <arg name="delay_max_steps" value="$(arg delay_max_steps)" />
+    <arg name="delay_fixed_steps" value="$(arg delay_fixed_steps)" />
+    <arg name="delay_mean_steps" value="$(arg delay_mean_steps)" />
+    <arg name="delay_std_steps" value="$(arg delay_std_steps)" />
+    <arg name="delay_seed" value="$(arg delay_seed)" />
+    <arg name="synthetic_ground_truth" value="$(arg synthetic_ground_truth)" />
+    <arg name="synthetic_delay_distribution" value="$(arg synthetic_delay_distribution)" />
+    <arg name="synthetic_delay_min_ms" value="$(arg synthetic_delay_min_ms)" />
+    <arg name="synthetic_delay_max_ms" value="$(arg synthetic_delay_max_ms)" />
+    <arg name="synthetic_delay_fixed_ms" value="$(arg synthetic_delay_fixed_ms)" />
+    <arg name="synthetic_delay_seed" value="$(arg synthetic_delay_seed)" />
+  </include>
+
+  <!-- The tracker starts immediately but waits for /tossing_experiment_ready,
+       so it cannot detach the object during calibration. -->
+  <node pkg="mcpilot" type="read_bullet_state.py" name="bullet_state_node" output="screen" required="true" />
+  <!-- Start tossing_experiment_script.py manually after Gazebo and MoveIt are
+       fully initialized. Starting it here creates a startup race on Noetic. -->
+</launch>

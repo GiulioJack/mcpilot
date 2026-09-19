@@ -1,0 +1,98 @@
+<launch>
+
+	  <!-- specify the planning pipeline -->
+	  <arg name="pipeline" default="ompl" />
+
+	  <!-- Panda specific options -->
+	  <arg name="load_gripper" default="true" />
+	  <arg name="transmission" default="effort" />
+
+	  <!-- Gazebo specific options -->
+	  <arg name="gazebo_gui" default="true" />
+	  <arg name="paused" default="false" />
+
+      <!-- Physical release-delay model.  The opening-command anticipation is
+           updated online by the MC-PILOT script after delay calibration. -->
+      <arg name="delay_distribution" default="uniform" />
+      <arg name="delay_min_steps" default="120" />
+      <arg name="delay_max_steps" default="130" />
+      <arg name="delay_fixed_steps" default="125" />
+      <arg name="delay_mean_steps" default="125.0" />
+      <arg name="delay_std_steps" default="2.5" />
+      <arg name="delay_seed" default="0" />
+      <arg name="release_anticipation_seconds" default="0.0" />
+
+      <!-- Clean synthetic ground-truth identification mode.  When enabled,
+           the physical actuator delay is bypassed and the projectile is
+           detached at nominal_release + a known sampled residual. -->
+      <arg name="synthetic_ground_truth" default="true" />
+      <arg name="synthetic_delay_distribution" default="uniform" />
+      <arg name="synthetic_delay_min_ms" default="20.0" />
+      <arg name="synthetic_delay_max_ms" default="30.0" />
+      <arg name="synthetic_delay_fixed_ms" default="25.0" />
+      <arg name="synthetic_delay_seed" default="0" />
+
+	  <!-- Launch the gazebo simulator and spawn the robot -->
+	  <include file="$(find franka_gazebo)/launch/panda.launch" pass_all_args="true">
+	    <arg name="headless" value="$(eval not arg('gazebo_gui'))" />
+	    <arg name="use_gripper" default="$(arg load_gripper)" />
+	    <arg name="controller" default="$(arg transmission)_joint_trajectory_controller" />
+	    <arg name="world" value="$(find mcpilot)/worlds/simple_tossing_env.sdf"/>
+	    <arg name="z" value="1.03" />
+        <arg name="yaw" value="3.1416" />
+	  </include>
+
+	  <include file="$(find panda_moveit_config)/launch/demo.launch" pass_all_args="true">
+	    <!-- robot description is loaded by gazebo.launch, to enable Gazebo features -->
+	    <arg name="load_robot_description" value="false" />
+	    <!-- MoveItSimpleControllerManager provides ros_control's JointTrajectory controllers
+		 as well as GripperCommand actions -->
+	    <arg name="moveit_controller_manager" value="simple" />
+	  </include>
+
+    <param name="toss_type" type="string" value="catapult_back" /> <!-- below / catapult_back -->
+
+    <param name="/tossing/release_delay/enabled" value="true" />
+    <param name="/tossing/release_delay/distribution" value="$(arg delay_distribution)" />
+    <param name="/tossing/release_delay/min_steps" value="$(arg delay_min_steps)" />
+    <param name="/tossing/release_delay/max_steps" value="$(arg delay_max_steps)" />
+    <param name="/tossing/release_delay/fixed_steps" value="$(arg delay_fixed_steps)" />
+    <param name="/tossing/release_delay/mean_steps" value="$(arg delay_mean_steps)" />
+    <param name="/tossing/release_delay/std_steps" value="$(arg delay_std_steps)" />
+    <param name="/tossing/release_delay/seed" value="$(arg delay_seed)" />
+    <param name="/tossing/release_delay/reset_id" value="0" />
+    <param name="/tossing/release_delay/trigger_mode" value="command" />
+    <param name="/tossing/release_delay/anticipation_seconds" value="$(arg release_anticipation_seconds)" />
+
+    <param name="/tossing/release_delay/synthetic_ground_truth/enabled" value="$(arg synthetic_ground_truth)" />
+    <param name="/tossing/release_delay/synthetic_ground_truth/distribution" value="$(arg synthetic_delay_distribution)" />
+    <param name="/tossing/release_delay/synthetic_ground_truth/min_ms" value="$(arg synthetic_delay_min_ms)" />
+    <param name="/tossing/release_delay/synthetic_ground_truth/max_ms" value="$(arg synthetic_delay_max_ms)" />
+    <param name="/tossing/release_delay/synthetic_ground_truth/fixed_ms" value="$(arg synthetic_delay_fixed_ms)" />
+    <param name="/tossing/release_delay/synthetic_ground_truth/seed" value="$(arg synthetic_delay_seed)" />
+    <param name="/tossing/release_delay/synthetic_ground_truth/reset_id" value="0" />
+
+
+	<!-- <node pkg="mcpilot" name="models_state_publisher" type="models_state_publisher.py" output="screen"> </node> -->
+
+	<!-- <node pkg="mcpilot" name="read_ball_state" type="read_ball_state.py" output="screen">   </node> -->
+
+	<!-- Parameters -->
+	<!-- The target models need to be set at initialization and cannot be swapped dynamically-->
+	<param name="target_model_file_hole_path" type="string" value="worlds/target_cyl_collision/model.sdf" />
+	<!-- <param name="target_model_file_hole_path" type="string" value="worlds/target_cyl_collision_big/model.sdf" /> -->
+	<!-- Smaller target: "worlds/target_cyl_collision/model.sdf" -->
+	<!-- Bigger target: "worlds/target_cyl_collision_big/model.sdf" -->
+	<param name="target_model_file_full_path" type="string" value="worlds/unit_cylinder/model.sdf" />
+
+    <param name="bullet_models_files_path" type="string" value="worlds/bullets/" />
+    <param name="bullet_name" type="string" value="red_ball_friction" />
+
+    <arg name="air_mass_density" type="double" value="1.293"/>
+    <arg name="fluid_resitance_coeff_red_ball" type="double" value="$(eval 0.5 * 3.1415 * 0.0215 * 0.0215 * arg('air_mass_density'))"/>
+    <arg name="reynolds_mult_coeff_red_ball" type="double" value="$(eval 100000 * (2 * 0.0215) / 1.47)"/>
+    <node pkg="rostopic" type="rostopic" name="fluid_resitance_red_ball_topic" args="pub fluid_resitance_red_ball std_msgs/Float32 $(arg fluid_resitance_coeff_red_ball)"/>
+    <node pkg="rostopic" type="rostopic" name="reynolds_mult_red_ball_topic" args="pub reynolds_mult_red_ball std_msgs/Float32 $(arg reynolds_mult_coeff_red_ball)"/>
+
+
+</launch>
